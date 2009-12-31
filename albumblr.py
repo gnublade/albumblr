@@ -7,21 +7,21 @@ import pylast
 
 from config import *
 
-def find_albums(api, username):
-    user = api.get_user(username)
-    lib = user.get_library()
+def get_top_track_albums(user):
     albums = {}
-
-    top_tracks = user.get_top_tracks()
-    for track in top_tracks:
+    for track in user.get_top_tracks():
         album = track.item.get_album()
         logging.debug("Adding top track '%s' album '%s'" % (track.item, album))
         if album:
             albums[album.get_mbid()] = album
         else:
             logging.info("No album for track '%s'" % track.item)
+    return albums.values()
 
-    for mbid, album in albums.items():
+
+def find_albums_owned(user, albums):
+    lib = user.get_library()
+    for album in albums:
         logging.info("Looking for tracks on '%s'" % album)
         album_tracks = album.get_tracks()
         have_tracks  = lib.get_tracks(
@@ -31,13 +31,14 @@ def find_albums(api, username):
         logging.info("    found %d of %d tracks" % (have_len, album_len))
         if (album_len - have_len) > 1:
             logging.debug("Removing album '%s'" % album)
-            del albums[mbid]
         else:
             yield album
 
 def main(username):
     api = pylast.get_lastfm_network(api_key=API_KEY, api_secret=API_SECRET)
-    albums = find_albums(api, username)
+    user = api.get_user(username)
+    top_track_albums = get_top_track_albums(user)
+    albums = find_albums_owned(user, top_track_albums)
     for album in albums:
         print album
 

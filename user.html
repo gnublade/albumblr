@@ -1,0 +1,14 @@
+<html>
+    <head>
+        <title>Albumblr - {{ username }}</title>
+    </head>
+
+    <body>
+        <h1>Albumblr - {{ username }}</h1>
+        <ul>
+            {% for album in albums %}
+            <li>{{ album }}</li>
+            {% endfor %}
+        </ul>
+    </body>
+</html>

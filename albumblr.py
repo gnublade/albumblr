@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys
+import re
 import logging
 from optparse import OptionParser
 
@@ -82,7 +83,31 @@ def run_cgi():
             path = os.path.join(DIR_PATH, 'index.html')
             self.response.out.write(template.render(path, {}))
 
-    app = webapp.WSGIApplication([('/', MainPage)], debug=DEBUG)
+    class UserPage(webapp.RequestHandler):
+
+        def get(self):
+            m = re.match(r'^/user/([^/]*).*', self.request.path)
+            if m is None:
+                self.error(404)
+            username = m.group(1)
+            logging.info(username)
+            api = pylast.get_lastfm_network(
+                    api_key    = API_KEY,
+                    api_secret = API_SECRET)
+            user = api.get_user(username)
+            albums = get_all_albums(user)
+            path = os.path.join(DIR_PATH, 'user.html')
+            values = dict(
+                    albums = find_albums_owned(user, albums),
+                    username = username)
+            self.response.out.write(template.render(path, values))
+
+        def post(self):
+            self.redirect('/user/' + self.request.get('username'))
+
+    app = webapp.WSGIApplication(
+            [('/', MainPage), ('/user/?.*', UserPage)],
+            debug = DEBUG)
     run_wsgi_app(app)
 
 def run_cli():

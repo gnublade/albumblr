@@ -9,15 +9,16 @@ DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(os.path.join(DIR_PATH, 'lib'))
 import pylast
 
-from config import *
-from common import (
-    get_api, get_all_albums, get_top_track_albums, find_albums_owned)
+from api import API
 
 def main(username, all_albums=False):
-    api = get_api()
-    user = api.get_user(username)
-    albums = get_all_albums(user) if all_albums else get_top_track_albums(user)
-    for album in find_albums_owned(user, albums):
+    api = API()
+    if all_albums:
+        albums = api.get_all_albums(username)
+    else:
+        albums = api.get_top_track_albums(username)
+
+    for album in api.find_albums_owned(username, albums):
         print album
 
 def add_options(parser):

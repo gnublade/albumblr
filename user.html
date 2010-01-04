@@ -5,10 +5,24 @@
 
     <body>
         <h1>Albumblr - {{ username }}</h1>
-        <ul>
-            {% for album in albums %}
-            <li>{{ album }}</li>
-            {% endfor %}
+        <ul id='album-list'>
         </ul>
     </body>
+    <script src="http://www.google.com/jsapi"></script>
+    <script>
+        google.load("jquery", "1.3.2");
+        function populate_album_list(albums) {
+            for (var i = 0; i < albums.length; i++) {
+                $("#album-list").append("<li>" + albums[i] + "</li>");
+            }
+        }
+        google.setOnLoadCallback(function() {
+            $.getJSON("albums/",
+                function (albums) {
+                    if (albums) {
+                        populate_album_list(albums);
+                    }
+                });
+        });
+    </script>
 </html>

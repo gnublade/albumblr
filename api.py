@@ -16,6 +16,9 @@ class API(object):
                 api_key    = API_KEY,
                 api_secret = API_SECRET)
 
+    def get_album_by_mbid(self, mbid):
+        return self._lastfm.get_album_by_mbid(mbid)
+
     def get_all_albums(self, username):
         user = self._lastfm.get_user(username)
         lib = user.get_library()

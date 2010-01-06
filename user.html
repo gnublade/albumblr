@@ -6,23 +6,31 @@
     <body>
         <h1>Albumblr - {{ username }}</h1>
         <ul id='album-list'>
+            {% for album in albums %}
+            <li>{{ album }}</li>
+            {% endfor %}
         </ul>
     </body>
     <script src="http://www.google.com/jsapi"></script>
     <script>
         google.load("jquery", "1.3.2");
-        function populate_album_list(albums) {
+        function populateAlbumList(albums) {
+            $("#album-list").empty();
             for (var i = 0; i < albums.length; i++) {
                 $("#album-list").append("<li>" + albums[i] + "</li>");
             }
         }
-        google.setOnLoadCallback(function() {
-            $.getJSON("albums/",
+        function updateAlbums() {
+            $.getJSON("albums/owned",
                 function (albums) {
                     if (albums) {
-                        populate_album_list(albums);
+                        populateAlbumList(albums);
                     }
                 });
+            setTimeout('updateAlbums()', 10000);
+        }
+        google.setOnLoadCallback(function() {
+            updateAlbums();
         });
     </script>
 </html>

@@ -80,7 +80,7 @@ class UserAlbumsPage(BaseUserPage):
         self.response.headers['Content-Type'] = 'text/plain'
         status = UserAlbumStatus.get_by_key_name(username)
         if status:
-            output = status.to_xml()
+            output = json.dumps(status.to_dict(), indent=2)
         else:
             output = "No status for user '%s'" % username
         self.response.out.write(output)
@@ -90,7 +90,7 @@ class UserAlbumsPage(BaseUserPage):
         status = UserAlbumStatus.get_or_insert(username, user=user)
         if status.processed < status.processing:
             return
-        user_albums = UserAlbumsOwned.all().filter('user =', user)
+        user_albums = UserAlbumsOwned.all().filter('user', user)
         user_album_mbids = set(a.album.mbid for a in user_albums)
         lib_albums = self.api.get_all_albums(user.username)
         album_mbids = [ (a,a.get_mbid()) for a in lib_albums ]

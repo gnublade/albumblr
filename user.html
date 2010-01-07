@@ -20,17 +20,21 @@
                 $("#album-list").append("<li>" + albums[i] + "</li>");
             }
         }
-        function updateAlbums() {
-            $.getJSON("albums/owned",
-                function (albums) {
-                    if (albums) {
-                        populateAlbumList(albums);
+        var processed = 0;
+        function checkStatus() {
+            $.getJSON("albums/status",
+                function (s) {
+                    if (s.processed > processed) {
+                        processed = s.processed;
+                        $.getJSON("albums/owned", populateAlbumList);
+                    }
+                    if (s && s.processed < s.processing) {
+                        setTimeout('checkStatus()', 10000);
                     }
                 });
-            setTimeout('updateAlbums()', 10000);
         }
         google.setOnLoadCallback(function() {
-            updateAlbums();
+            checkStatus();
         });
     </script>
 </html>

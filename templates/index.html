@@ -1,15 +1,14 @@
-<html>
-    <head>
-        <title>Albumblr</title>
-    </head>
+{% extends "base.html" %}
 
-    <body>
-        <h1>Albumblr</h1>
-        <form action='/user' method='post'>
-            <div>
-                <input name='username' type='text'/>
-                <input type="submit" value="Find albums">
-            </div>
-        </form>
-    </body>
-</html>
+{% block title %}Albumblr{% endblock %}
+
+{% block content %}
+<h2>Find your albums</h2>
+<form action='/user' method='post'>
+<div id='username-entry'>
+  Enter your <a href='http://last.fm'>Last.fm</a> username:
+  <input name='username' type='text'/>
+  <input type="submit" value="Find albums">
+</div>
+</form>
+{% endblock %}

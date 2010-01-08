@@ -15,26 +15,22 @@
     <script>
         google.load("jquery", "1.3.2");
         function populateAlbumList(albums) {
-            $("#album-list").empty();
             for (var i = 0; i < albums.length; i++) {
                 $("#album-list").append("<li>" + albums[i] + "</li>");
             }
         }
-        var processed = 0;
-        function checkStatus() {
-            $.getJSON("albums/status",
-                function (s) {
-                    if (s.processed > processed) {
-                        processed = s.processed;
-                        $.getJSON("albums/owned", populateAlbumList);
-                    }
-                    if (s && s.processed < s.processing) {
-                        setTimeout('checkStatus()', 10000);
-                    }
-                });
+        function getProcessed() {
+            $.post("albums/processed", null, function (data) {
+                if (data.albums) {
+                    populateAlbumList(data.albums);
+                }
+                if (data.remaining) {
+                    setTimeout('getProcessed()', 1000);
+                }
+            }, 'json');
         }
         google.setOnLoadCallback(function() {
-            checkStatus();
+            $.post("albums/start", null, getProcessed);
         });
     </script>
 </html>

@@ -1,0 +1,9 @@
+Processed
+=========
+
+:User:  {{ user }}
+
+{% for entry in process_list %}
+:Album: {{ entry.album }}
+:Owned: {{ entry.owned|yesno }}
+{% endfor %}

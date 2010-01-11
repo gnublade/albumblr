@@ -54,7 +54,7 @@ def run_cli():
     if post_func: post_func(opts, args)
     init_logging(opts)
 
-    main(*args, all_albums=opts.all)
+    main(all_albums=opts.all, *args)
 
 if __name__ == '__main__':
-    run_cgi() if 'GATEWAY_INTERFACE' in os.environ else run_cli()
+    run_cgi() if 'SERVER_SOFTWARE' in os.environ else run_cli()

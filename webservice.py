@@ -66,6 +66,11 @@ class UserPage(BaseUserPage):
         api_user = self.api.get_user(username)
         values = dict(
             username = username,
+            avatar   = api_user.get_cover_image(),
+            realname = api_user.get_realname(),
+            age      = api_user.get_age(),
+            gender   = api_user.get_gender(),
+            country  = api_user.get_country(),
             albums   = (a.album for a in cached_albums_owned))
         self.response.out.write(template.render(path, values))
 

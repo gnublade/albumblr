@@ -1,8 +1,18 @@
 {% extends "base.html" %}
 
 {% block title %}{{ username }}{% endblock %}
+
 {% block content %}
-<h2>{{ username }}'s Albums</h2>
+<div id="user-badge">
+<div id="badge-avatar"><img src="{{ avatar }}" /></div>
+<div id="badge-head"><h2>{{ username }}</h2></div>
+<div id="badge-info">
+    <strong class="fn">{{ realname }}</strong>,
+    {{ age }}, {{ gender }}, {{ country }}
+</div>
+</div>
+
+<h3 class="clearit">Albums</h3>
 <p>
 Below is a list of albums that I think you own, whether on CD or some other
 format.  If this is your first visit to Albumblr it might take me a little

@@ -36,3 +36,17 @@ a img {
     padding: 1em;
 }
 
+#badge-avatar {
+    display: inline;
+    float: left;
+    margin: 0 15px 15px 0;
+}
+
+#badge-avatar img {
+    padding: 1px;
+    border: 1px solid #CCCCCC;
+}
+
+.clearit {
+    clear: both;
+}

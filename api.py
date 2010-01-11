@@ -23,7 +23,8 @@ class API(object):
         user = self._lastfm.get_user(username)
         lib = user.get_library()
         for album in lib.get_albums():
-            yield album.item
+            # :WORKAROUND: album under dev is an object but a dict under GAE.
+            yield album['item'] if isinstance(album, dict) else album.item
 
     def get_top_track_albums(self, username):
         user = self._lastfm.get_user(username)

@@ -9,6 +9,15 @@ body {
     margin: 0;
 }
 
+h2 {
+    margin-top: 0;
+}
+
+a img {
+    border: 0;
+    vertical-align: middle;
+}
+
 #header {
     background: #DD1100;
     color: white;
@@ -18,10 +27,6 @@ body {
 }
 #header h1 {
     margin: 0;
-}
-
-h2 {
-    margin-top: 0;
 }
 
 #content {

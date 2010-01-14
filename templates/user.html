@@ -80,11 +80,11 @@ function getProcessed() {
 google.setOnLoadCallback(function() {
     $("#tabs").tabs();
     //$.post("albums/start", null, getProcessed);
-    $.getJSON("albums/wanted", function (data) {
-        if (data.albums) {
-            populateAlbumList($("#wanted-album-list"), data.albums);
-        }
-    });
+    //$.getJSON("albums/wanted", function (data) {
+    //    if (data.albums) {
+    //        populateAlbumList($("#wanted-album-list"), data.albums);
+    //    }
+    //});
 });
 </script>
 <script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>

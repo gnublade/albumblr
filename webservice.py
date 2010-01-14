@@ -7,12 +7,6 @@ from optparse import OptionParser
 from datetime import datetime
 from functools import wraps
 
-DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-TMPL_PATH = os.path.join(DIR_PATH, 'templates')
-
-sys.path.append(os.path.join(DIR_PATH, 'lib'))
-import pylast
-
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template, util
 from google.appengine.api.labs import taskqueue
@@ -24,9 +18,6 @@ template.register_template_library('templatefilters')
 from api import API
 from config import *
 from model import User, Album, UserAlbums, UserAlbumsProcessing
-
-DEFAULT_LIMIT = 10
-JSON_INDENT   = 2
 
 class ToJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -76,9 +67,6 @@ class BaseUserPage(webapp.RequestHandler):
             self._api = API()
         return self._api
 
-    def get_user(self, username):
-        return User.get_or_insert(username, username=username)
-
 class UserPage(BaseUserPage):
 
     def post(self, username):
@@ -88,7 +76,7 @@ class UserPage(BaseUserPage):
     @expose('user.html')
     def get(self, username):
         """Show a user page defaulting to a list of owned albums."""
-        db_user = self.get_user(username)
+        user = self.api.get_user(username)
 
         # Bang the start processing task on the queue as fetching a
         # users' albums from their library takes a while and we want to
@@ -98,19 +86,20 @@ class UserPage(BaseUserPage):
         #taskqueue.add(url=start_url)
 
         # Show the albums we already know the user owns.
-        cached_albums = UserAlbums.all().filter('user', db_user)
+        stored_albums = UserAlbums.all().filter('user', user)
 
-        api_user = self.api.get_user(username)
+        user = self.api.get_user(username, check_for_update = True)
         return dict(
             username = username,
-            avatar   = api_user.get_cover_image(),
-            realname = api_user.get_realname(),
-            age      = api_user.get_age(),
-            gender   = api_user.get_gender(),
-            country  = api_user.get_country(),
+            avatar   = user.avatar,
+            realname = user.realname,
+            age      = user.age,
+            gender   = user.gender,
+            country  = user.country,
 
-            wanted_albums = (a.album for a in cached_albums if not a.owned),
-            owned_albums  = (a.album for a in cached_albums if a.owned))
+            albums = dict(
+                wanted = (a.album for a in stored_albums if a.owned == False),
+                owned  = (a.album for a in stored_albums if a.owned)))
 
 class UserAlbumsPage(BaseUserPage):
 
@@ -134,9 +123,9 @@ class UserAlbumsPage(BaseUserPage):
 
     @expose(format='json')
     def index(self, username):
-        albums = self.api.get_all_albums(username)
-        album_list = [ str(a) for a in albums ]
-        return album_list
+        user = self.api.get_user(username)
+        albums = self.api.get_user_albums(user)
+        return albums
 
     @expose(format='json')
     def wanted(self, username):
@@ -144,7 +133,9 @@ class UserAlbumsPage(BaseUserPage):
         page_index = self.request.get('page')
         if page_index:
             params['page'] = page_index
+        api.maybe_update_albums()
         albums = self.api.get_all_albums(username)
+        album_mbids = [ album.get_mbid for album in albums ]
         wanted_albums = self.api.find_albums_wanted(username, albums, **params)
         return list(wanted_albums)
 

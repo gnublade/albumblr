@@ -2,6 +2,7 @@
 
 import os, sys
 import logging
+from itertools import ifilter, ifilterfalse
 
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(os.path.join(DIR_PATH, 'lib'))
@@ -44,19 +45,32 @@ class API(object):
             else:
                 logging.info("No album for track '%s'" % track)
 
-    def find_albums_owned(self, username, albums):
+    def _is_album_owned(self, username):
+        """Coroutine to test whether album is owned by a given user."""
         user = self._lastfm.get_user(username)
         lib = user.get_library()
-        for album in albums:
+        album = yield
+        while 1:
             logging.info("Looking for tracks on '%s'" % album)
             album_tracks = album.get_tracks()
             have_tracks  = lib.get_tracks(
                     artist = album.artist.name,
                     album  = album.title)
-            album_len, have_len = len(album_tracks), len(have_tracks)
-            logging.info("    found %d of %d tracks" % (have_len, album_len))
-            if (album_len - have_len) > 1:
-                logging.debug("Removing album '%s'" % album)
-            else:
-                yield album
+            logging.info("    found %d of %d tracks" % (
+                len(have_tracks), len(album_tracks)))
+            owned = (len(album_tracks) - len(have_tracks)) > 1
+            album = yield (album, owned)
+
+    def find_albums_owned(self, username, albums, **params):
+        """Return all of the given albums which the user owns."""
+        pred = self._is_album_owned(username).send
+        return ifilter(pred, albums)
+
+    def find_albums_wanted(self, username, albums, **params):
+        """Return all of the given albums which the user doesn't own."""
+        pred = self._is_album_owned(username).send
+        yielded = pred(None)
+        logging.debug(yielded)
+        return ifilterfalse(pred, albums)
+
 

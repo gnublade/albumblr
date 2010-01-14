@@ -23,7 +23,7 @@ template.register_template_library('templatefilters')
 
 from api import API
 from config import *
-from model import User, Album, UserAlbumsOwned, UserAlbumsProcessing
+from model import User, Album, UserAlbums, UserAlbumsProcessing
 
 DEFAULT_LIMIT = 10
 JSON_INDENT   = 2
@@ -98,7 +98,7 @@ class UserPage(BaseUserPage):
         #taskqueue.add(url=start_url)
 
         # Show the albums we already know the user owns.
-        cached_albums_owned = UserAlbumsOwned.all().filter('user', db_user)
+        cached_albums = UserAlbums.all().filter('user', db_user)
 
         api_user = self.api.get_user(username)
         return dict(
@@ -108,8 +108,9 @@ class UserPage(BaseUserPage):
             age      = api_user.get_age(),
             gender   = api_user.get_gender(),
             country  = api_user.get_country(),
-            albums   = (a.album for a in cached_albums_owned))
 
+            wanted_albums = (a.album for a in cached_albums if not a.owned),
+            owned_albums  = (a.album for a in cached_albums if a.owned))
 
 class UserAlbumsPage(BaseUserPage):
 
@@ -138,9 +139,19 @@ class UserAlbumsPage(BaseUserPage):
         return album_list
 
     @expose(format='json')
+    def wanted(self, username):
+        params = { 'limit': 10 }
+        page_index = self.request.get('page')
+        if page_index:
+            params['page'] = page_index
+        albums = self.api.get_all_albums(username)
+        wanted_albums = self.api.find_albums_wanted(username, albums, **params)
+        return list(wanted_albums)
+
+    @expose(format='json')
     def owned(self, username):
         db_user = self.get_user(username)
-        cached_albums_owned = UserAlbumsOwned.all().filter('user', db_user)
+        cached_albums = UserAlbums.all().filter('user', db_user)
         return cached_albums
 
     @expose()
@@ -152,7 +163,7 @@ class UserAlbumsPage(BaseUserPage):
         album_mbids = [ (a,a.get_mbid()) for a in lib_albums ]
 
         # Don't include the albums we already know the user owns.
-        cached_albums_owned = UserAlbumsOwned.all().filter('user', db_user)
+        cached_albums_owned = UserAlbums.all().filter('user', db_user)
         cached_album_mbids = set(a.album.mbid for a in cached_albums_owned)
         albums = dict((mbid,a) for (a,mbid) in album_mbids
                       if mbid and mbid not in cached_album_mbids)

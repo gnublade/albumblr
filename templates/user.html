@@ -18,16 +18,21 @@
 
 <div id="tabs" class="clearit">
 <ul>
-    <li><a href="#liked-albums">Would Like</a></li>
+    <li><a href="#wanted-albums">Would Like</a></li>
     <li class="selected"><a href="#owned-albums">Owned</a></li>
     <li><a href="#recommended-artist-albums">By Recommended Artists</a></li>
 </ul>
 
-<div id="liked-albums">
+<div id="wanted-albums">
 <p>
 Based on the albums {{ username }}'s got we think you would like the following
 albums:
 </p>
+<ul id='album-list'>
+    {% for album in wanted_albums %}
+    <li>{{ album }}</li>
+    {% endfor %}
+</ul>
 </div>
 
 <div id="owned-albums">
@@ -38,7 +43,7 @@ while to figure this out so please be patient, refreshing just makes Google
 angry!
 </p>
 <ul id='album-list'>
-    {% for album in albums %}
+    {% for album in owned_albums %}
     <li>{{ album }}</li>
     {% endfor %}
 </ul>
@@ -54,19 +59,18 @@ a pinch of salt.
 
 {% block bodyscript %}
 <script src="http://www.google.com/jsapi"></script>
-<script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>
 <script>
 google.load("jquery", "1.3.2");
 google.load("jqueryui", "1.7.2");
-function populateAlbumList(albums) {
+function populateAlbumList(ul, albums) {
     for (var i = 0; i < albums.length; i++) {
-        $("#album-list").append("<li>" + albums[i] + "</li>");
+        ul.append("<li>" + albums[i] + "</li>");
     }
 }
 function getProcessed() {
     $.post("albums/processed", null, function (data) {
         if (data.albums) {
-            populateAlbumList(data.albums);
+            populateAlbumList($("#wanted-album-list"), data.albums);
         }
         if (data.remaining) {
             setTimeout('getProcessed()', 1000);
@@ -75,7 +79,13 @@ function getProcessed() {
 }
 google.setOnLoadCallback(function() {
     $("#tabs").tabs();
-    $.post("albums/start", null, getProcessed);
+    //$.post("albums/start", null, getProcessed);
+    $.getJSON("albums/wanted", function (data) {
+        if (data.albums) {
+            populateAlbumList($("#wanted-album-list"), data.albums);
+        }
+    });
 });
 </script>
+<script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>
 {% endblock %}

@@ -5,9 +5,11 @@ import re
 import logging
 from optparse import OptionParser
 from datetime import datetime
-from itertools import ifilter
+from functools import wraps
 
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+TMPL_PATH = os.path.join(DIR_PATH, 'templates')
+
 sys.path.append(os.path.join(DIR_PATH, 'lib'))
 import pylast
 
@@ -24,12 +26,47 @@ from config import *
 from model import User, Album, UserAlbumsOwned, UserAlbumsProcessing
 
 DEFAULT_LIMIT = 10
+JSON_INDENT   = 2
+
+class ToJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if callable(getattr(obj, '__json__', None)):
+            return obj.__json__()
+        elif hasattr(obj, '__str__'):
+            return obj.__str__()
+        else:
+            raise TypeError(repr(obj) + " is not JSON serializable")
+
+def dumps(o):
+    return json.dumps(o, indent=JSON_INDENT, cls=ToJSONEncoder)
+
+def expose(templatename=None, format=None):
+    if templatename:
+        path = os.path.join(TMPL_PATH, templatename)
+        default_renderer = lambda v: template.render(path, v)
+    else:
+        default_renderer = lambda v: v
+    formats = {
+        'json' : ('text/javascript', dumps),
+        None   : (None, default_renderer) }
+    content_type, renderer = formats.get(format, formats[None])
+    def wrapper(func):
+        @wraps(func)
+        def wrapped(self, *args, **kwargs):
+            if content_type:
+                self.response.headers['Content-Type'] = content_type
+            values = func(self, *args, **kwargs)
+            self.response.out.write(renderer(values))
+        # :TODO: Restrict the methods.
+        wrapped.exposed_methods = [ 'GET', 'POST' ]
+        return wrapped
+    return wrapper
 
 class MainPage(webapp.RequestHandler):
 
+    @expose('index.html')
     def get(self):
-        path = os.path.join(TMPL_PATH, 'index.html')
-        self.response.out.write(template.render(path, {}))
+        return {}
 
 class BaseUserPage(webapp.RequestHandler):
 
@@ -48,6 +85,7 @@ class UserPage(BaseUserPage):
         """Issue a redirect to the given user page."""
         self.redirect('/user/%s/' % self.request.get('username'))
 
+    @expose('user.html')
     def get(self, username):
         """Show a user page defaulting to a list of owned albums."""
         db_user = self.get_user(username)
@@ -62,9 +100,8 @@ class UserPage(BaseUserPage):
         # Show the albums we already know the user owns.
         cached_albums_owned = UserAlbumsOwned.all().filter('user', db_user)
 
-        path = os.path.join(TMPL_PATH, 'user.html')
         api_user = self.api.get_user(username)
-        values = dict(
+        return dict(
             username = username,
             avatar   = api_user.get_cover_image(),
             realname = api_user.get_realname(),
@@ -72,50 +109,41 @@ class UserPage(BaseUserPage):
             gender   = api_user.get_gender(),
             country  = api_user.get_country(),
             albums   = (a.album for a in cached_albums_owned))
-        self.response.out.write(template.render(path, values))
+
 
 class UserAlbumsPage(BaseUserPage):
 
-    get_actions = [ 'index', 'owned' ]
-    default_get_action = 'index'
-
-    post_actions = [ 'start', 'stop', 'processed', 'process' ]
-    defautl_get_action = None
-
-    if DEBUG:
-        get_actions += post_actions
-
     def get(self, username, action):
-        action = action or self.default_get_action
-        if action in self.get_actions:
-            output = getattr(self, action)(username)
+        action = action or 'index'
+        func = getattr(self, action)
+        logging.debug("Trying GET action '%s'" % action)
+        if 'GET' in getattr(func, 'exposed_methods', []):
+            return func(username)
         else:
             self.error(404)
-        if output:
-            self.response.out.write(output)
 
     def post(self, username, action):
-        action = action or self.default_post_action
-        if action in self.post_actions:
-            output = getattr(self, action)(username)
+        action = action or None
+        func = getattr(self, action)
+        logging.debug("Trying POST action '%s'" % action)
+        if 'POST' in getattr(func, 'exposed_methods', []):
+            return func(username)
         else:
             self.error(404)
-        if output:
-            self.response.out.write(output)
 
+    @expose(format='json')
     def index(self, username):
         albums = self.api.get_all_albums(username)
         album_list = [ str(a) for a in albums ]
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.out.write(json.dumps(album_list, indent=2))
+        return album_list
 
+    @expose(format='json')
     def owned(self, username):
         db_user = self.get_user(username)
         cached_albums_owned = UserAlbumsOwned.all().filter('user', db_user)
-        cached_albums = [ str(a.album) for a in cached_albums_owned ]
-        self.response.headers['Content-Type'] = 'text/javascript'
-        self.response.out.write(json.dumps(cached_albums, indent=2))
+        return cached_albums
 
+    @expose()
     def start(self, username):
         """Start checking for owned albums."""
         db_user = self.get_user(username)
@@ -147,9 +175,9 @@ class UserAlbumsPage(BaseUserPage):
             os.path.dirname(self.request.path), "process")
         taskqueue.add(url=task_url, method='GET')
 
+    @expose(format='plain')
     def stop(self, username):
         """Stop processing albums."""
-        self.response.headers['Content-Type'] = 'text/plain'
         db_user = self.get_user(username)
         deleted = 0
         for entry in UserAlbumsProcessing.all().filter('user', db_user):
@@ -159,6 +187,7 @@ class UserAlbumsPage(BaseUserPage):
             deleted, username)
         return output
 
+    @expose('process.txt')
     def process(self, username, limit=DEFAULT_LIMIT):
         # Grab the next item for processing
         db_user = self.get_user(username)
@@ -186,10 +215,9 @@ class UserAlbumsPage(BaseUserPage):
             os.path.dirname(self.request.path), "process")
         taskqueue.add(url=task_url, method='GET')
 
-        values = dict(user=db_user, process_list=process_list)
-        path = os.path.join(TMPL_PATH, 'process.txt')
-        return template.render(path, values)
+        return dict(user=db_user, process_list=process_list)
 
+    @expose(format='json')
     def processed(self, username, limit=DEFAULT_LIMIT):
         """Fetch newly processed owned albums and purge."""
         db_user = self.get_user(username)
@@ -208,10 +236,9 @@ class UserAlbumsPage(BaseUserPage):
             if p.owned:
                 owned_albums.append(str(p.album))
             p.delete()
-        values = { 'albums': owned_albums,
-                   'processed': processed_count,
-                   'remaining': remaining_count }
-        return json.dumps(values, indent=2)
+        return { 'albums': owned_albums,
+                 'processed': processed_count,
+                 'remaining': remaining_count }
 
 app = webapp.WSGIApplication([
         ('/', MainPage),

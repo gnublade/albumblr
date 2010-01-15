@@ -68,21 +68,32 @@ function populateAlbumList(ul, albums) {
         ul.append("<li>" + albums[i] + "</li>");
     }
 }
-function updateWantedAlbums() {
-    $.getJSON("albums/wanted", function (data) {
+function updateAlbums(url, containerId) {
+    $.getJSON(url, function (data) {
         if (data) {
-            populateAlbumList($("#wanted-album-list"), data);
+            populateAlbumList($(containerId), data);
             if (data.length < 10) {
-                setTimeout('updateWantedAlbums()', 1000);
+                updateAlbums(url, containerId);
             }
         }
     });
 }
-google.setOnLoadCallback(function() {
-    $("#tabs").tabs();
-    if ($("#wanted-album-list").children().length < 10) {
-        updateWantedAlbums();
+var tabs = [
+    [ "albums/wanted", "#wanted-album-list" ],
+    [ "albums/owned", "#owned-album-list" ],
+    [ "albums/recommended", "#recommended-album-list" ],
+];
+function selectTab(event, ui) {
+    var tab = tabs[ui.index];
+    var url = tab[0];
+    var containerId = tab[1];
+    if ($(containerId).children().length < 10) {
+        updateAlbums(url, containerId);
     }
+}
+google.setOnLoadCallback(function() {
+    var tabs = $("#tabs").tabs({ select: selectTab });
+    selectTab(null, { index: 0 });
 });
 </script>
 <script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>

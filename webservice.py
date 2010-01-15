@@ -6,6 +6,7 @@ import logging
 from optparse import OptionParser
 from datetime import datetime
 from functools import wraps
+from itertools import islice
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template, util
@@ -80,17 +81,6 @@ class UserPage(BaseUserPage):
         """Show a user page defaulting to a list of owned albums."""
         user = self.api.get_user(username)
 
-        # Bang the start processing task on the queue as fetching a
-        # users' albums from their library takes a while and we want to
-        # display the page immediately.
-        # Or maybe leave it to the client instead.
-        #start_url = self.request.path + 'albums/start'
-        #taskqueue.add(url=start_url)
-
-        # Show the albums we already know the user owns.
-        stored_albums = UserAlbums.all().filter('user', user)
-
-        user = self.api.get_user(username, check_for_update = True)
         return dict(
             username = username,
             avatar   = user.avatar,
@@ -100,25 +90,25 @@ class UserPage(BaseUserPage):
             country  = user.country,
 
             albums = dict(
-                wanted = (a.album for a in stored_albums if a.owned == False),
-                owned  = (a.album for a in stored_albums if a.owned)))
+                wanted = self.api.get_albums_wanted(user),
+                owned  = self.api.get_albums_owned(user)))
 
 class UserAlbumsPage(BaseUserPage):
 
     def get(self, username, action):
         action = action or 'index'
-        func = getattr(self, action)
-        logging.debug("Trying GET action '%s'" % action)
+        func = getattr(self, action, None)
         if 'GET' in getattr(func, 'exposed_methods', []):
+            logging.debug("Trying GET action '%s'" % action)
             return func(username)
         else:
             self.error(404)
 
     def post(self, username, action):
         action = action or None
-        func = getattr(self, action)
-        logging.debug("Trying POST action '%s'" % action)
+        func = getattr(self, action, None)
         if 'POST' in getattr(func, 'exposed_methods', []):
+            logging.debug("Trying POST action '%s'" % action)
             return func(username)
         else:
             self.error(404)
@@ -126,6 +116,7 @@ class UserAlbumsPage(BaseUserPage):
     @expose(format='json')
     def index(self, username):
         user = self.api.get_user(username)
+        self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
         albums = self.api.get_user_albums(user, page)
         return albums
@@ -133,6 +124,7 @@ class UserAlbumsPage(BaseUserPage):
     @expose(format='json')
     def wanted(self, username):
         user = self.api.get_user(username)
+        self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
         albums = self.api.get_albums_wanted(user, page)
         return albums
@@ -140,6 +132,7 @@ class UserAlbumsPage(BaseUserPage):
     @expose(format='json')
     def owned(self, username):
         user = self.api.get_user(username)
+        self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
         albums = self.api.get_albums_owned(user, page)
         return albums

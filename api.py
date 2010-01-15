@@ -79,7 +79,7 @@ class API(object):
             try:
                 album = Album.get_or_insert(mbid,
                     mbid   = mbid,
-                    artist = str(lastfm_album.artist),
+                    artist = unicode(str(lastfm_album.artist), 'utf8'),
                     title  = lastfm_album.title)
             except BadArgumentError, e:
                 logging.debug("Cannot store album '%s'" % lastfm_album)
@@ -114,7 +114,6 @@ class API(object):
             self.update_user_albums(user, page)
 
     def get_user_albums(self, user, page):
-        self.maybe_update_user_albums(user, page)
         q = UserAlbums.all()
         q.filter('user', user)
         return q.fetch(DEFAULT_LIMIT, offset = DEFAULT_LIMIT * page)
@@ -130,8 +129,7 @@ class API(object):
         owned = (len(album_tracks) - len(have_tracks)) <= 1
         return owned
 
-    def get_albums_owned(self, user, page):
-        self.maybe_update_user_albums(user, user.last_updated_to)
+    def get_albums_owned(self, user, page=0):
         q = UserAlbums.all()
         q.filter('user', user)
         q.filter('owned', True)
@@ -139,8 +137,7 @@ class API(object):
         albums = [ a.album for a in user_albums ]
         return albums
 
-    def get_albums_wanted(self, user, page):
-        self.maybe_update_user_albums(user, user.last_updated_to)
+    def get_albums_wanted(self, user, page=0):
         q = UserAlbums.all()
         q.filter('user', user)
         q.filter('owned', False)

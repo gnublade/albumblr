@@ -64,7 +64,9 @@ class BaseUserPage(webapp.RequestHandler):
     @property
     def api(self):
         if getattr(self, '_api', None) is None:
-            self._api = API()
+            update = self.request.get_range('update',
+                    min_value=0, max_value=1, default=1)
+            self._api = API(enable_updates=update)
         return self._api
 
 class UserPage(BaseUserPage):
@@ -124,123 +126,23 @@ class UserAlbumsPage(BaseUserPage):
     @expose(format='json')
     def index(self, username):
         user = self.api.get_user(username)
-        albums = self.api.get_user_albums(user)
+        page = self.request.get_range('page', min_value=0)
+        albums = self.api.get_user_albums(user, page)
         return albums
 
     @expose(format='json')
     def wanted(self, username):
-        params = { 'limit': 10 }
-        page_index = self.request.get('page')
-        if page_index:
-            params['page'] = page_index
-        api.maybe_update_albums()
-        albums = self.api.get_all_albums(username)
-        album_mbids = [ album.get_mbid for album in albums ]
-        wanted_albums = self.api.find_albums_wanted(username, albums, **params)
-        return list(wanted_albums)
+        user = self.api.get_user(username)
+        page = self.request.get_range('page', min_value=0)
+        albums = self.api.get_albums_wanted(user, page)
+        return albums
 
     @expose(format='json')
     def owned(self, username):
-        db_user = self.get_user(username)
-        cached_albums = UserAlbums.all().filter('user', db_user)
-        return cached_albums
-
-    @expose()
-    def start(self, username):
-        """Start checking for owned albums."""
-        db_user = self.get_user(username)
-        lib_albums = self.api.get_all_albums(username)
-        # :TODO: Optimise this so we only pull the data once.
-        album_mbids = [ (a,a.get_mbid()) for a in lib_albums ]
-
-        # Don't include the albums we already know the user owns.
-        cached_albums_owned = UserAlbums.all().filter('user', db_user)
-        cached_album_mbids = set(a.album.mbid for a in cached_albums_owned)
-        albums = dict((mbid,a) for (a,mbid) in album_mbids
-                      if mbid and mbid not in cached_album_mbids)
-
-        # Don't re-add any that we are already processing.
-        processing = UserAlbumsProcessing.all().filter('user', db_user)
-        for album in (p.album for p in processing):
-            del albums[album.mbid]
-
-        # Create processing entries for the rest
-        for mbid, album_info in albums.iteritems():
-            album = Album.get_or_insert(mbid,
-                    mbid   = mbid.encode('utf8'),
-                    artist = album_info.artist.name,
-                    title  = album_info.title)
-            UserAlbumsProcessing(user=db_user, album=album).put()
-
-        # Add a task to do the work
-        task_url = "%s/%s" % (
-            os.path.dirname(self.request.path), "process")
-        taskqueue.add(url=task_url, method='GET')
-
-    @expose(format='plain')
-    def stop(self, username):
-        """Stop processing albums."""
-        db_user = self.get_user(username)
-        deleted = 0
-        for entry in UserAlbumsProcessing.all().filter('user', db_user):
-            entry.delete()
-            deleted += 1
-        output = "Stopped processing %d albums for user '%s'" % (
-            deleted, username)
-        return output
-
-    @expose('process.txt')
-    def process(self, username, limit=DEFAULT_LIMIT):
-        # Grab the next item for processing
-        db_user = self.get_user(username)
-        q = UserAlbumsProcessing.all()
-        q.filter('user', db_user)
-        q.filter('owned', None)
-        process_list = q.fetch(limit)
-
-        for entry in process_list:
-            album = entry.album
-
-            # Check if the user owns the album
-            album_info = self.api.get_album_by_mbid(album.mbid)
-            if self.api.find_albums_owned(username, [album_info]):
-                entry.owned = True
-                logging.info(
-                    "Adding owned album '%s' for '%s'" % (album, db_user))
-                db_user.add_owned_album(album)
-            else:
-                entry.owned = False
-            entry.put()
-
-        # Queue up the next one.
-        task_url = "%s/%s" % (
-            os.path.dirname(self.request.path), "process")
-        taskqueue.add(url=task_url, method='GET')
-
-        return dict(user=db_user, process_list=process_list)
-
-    @expose(format='json')
-    def processed(self, username, limit=DEFAULT_LIMIT):
-        """Fetch newly processed owned albums and purge."""
-        db_user = self.get_user(username)
-
-        # Fetch albums which have been processed.
-        q = UserAlbumsProcessing.all()
-        q.filter('user', db_user)
-        remaining_count = q.count()
-        q.filter('owned !=', None)
-        processing = q.fetch(limit)
-        processed_count = len(processing)
-
-        # Collect the owned albums and purge all afterwards
-        owned_albums = []
-        for p in processing:
-            if p.owned:
-                owned_albums.append(str(p.album))
-            p.delete()
-        return { 'albums': owned_albums,
-                 'processed': processed_count,
-                 'remaining': remaining_count }
+        user = self.api.get_user(username)
+        page = self.request.get_range('page', min_value=0)
+        albums = self.api.get_albums_owned(user, page)
+        return albums
 
 app = webapp.WSGIApplication([
         ('/', MainPage),

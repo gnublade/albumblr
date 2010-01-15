@@ -28,8 +28,8 @@
 Based on the albums {{ username }}'s got we think you would like the following
 albums:
 </p>
-<ul id='album-list'>
-    {% for album in wanted_albums %}
+<ul id='wanted-album-list'>
+    {% for album in albums.wanted %}
     <li>{{ album }}</li>
     {% endfor %}
 </ul>
@@ -42,8 +42,8 @@ format.  If this is your first visit to Albumblr it might take me a little
 while to figure this out so please be patient, refreshing just makes Google
 angry!
 </p>
-<ul id='album-list'>
-    {% for album in owned_albums %}
+<ul id='owned-album-list'>
+    {% for album in albums.owned %}
     <li>{{ album }}</li>
     {% endfor %}
 </ul>
@@ -63,28 +63,26 @@ a pinch of salt.
 google.load("jquery", "1.3.2");
 google.load("jqueryui", "1.7.2");
 function populateAlbumList(ul, albums) {
+    ul.empty();
     for (var i = 0; i < albums.length; i++) {
         ul.append("<li>" + albums[i] + "</li>");
     }
 }
-function getProcessed() {
-    $.post("albums/processed", null, function (data) {
-        if (data.albums) {
-            populateAlbumList($("#wanted-album-list"), data.albums);
+function updateWantedAlbums() {
+    $.getJSON("albums/wanted", function (data) {
+        if (data) {
+            populateAlbumList($("#wanted-album-list"), data);
+            if (data.length < 10) {
+                setTimeout('updateWantedAlbums()', 1000);
+            }
         }
-        if (data.remaining) {
-            setTimeout('getProcessed()', 1000);
-        }
-    }, 'json');
+    });
 }
 google.setOnLoadCallback(function() {
     $("#tabs").tabs();
-    //$.post("albums/start", null, getProcessed);
-    //$.getJSON("albums/wanted", function (data) {
-    //    if (data.albums) {
-    //        populateAlbumList($("#wanted-album-list"), data.albums);
-    //    }
-    //});
+    if ($("#wanted-album-list").children().length < 10) {
+        updateWantedAlbums();
+    }
 });
 </script>
 <script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>

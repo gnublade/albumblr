@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from google.appengine.ext import db
@@ -24,8 +25,8 @@ class User(db.Model):
     gender   = db.StringProperty(choices=["Male", "Female"])
     country  = db.StringProperty()
 
-    last_update_at = db.DateTimeProperty()
-    last_update_to = db.IntegerProperty()
+    last_updated_at = db.DateTimeProperty()
+    last_updated_to = db.IntegerProperty()
 
     def __str__(self):
         return self.username
@@ -41,8 +42,8 @@ class User(db.Model):
         return owned_album
 
     def is_update_due(self):
-        if self.last_update_at:
-            td = datetime.now() - self.last_update_at
+        if self.last_updated_at:
+            td = datetime.now() - self.last_updated_at
             seconds_since = td.days * SECONDS_PER_DAY + td.seconds
             update_due = seconds_since >= UPDATE_INTERVAL
         else:
@@ -55,7 +56,7 @@ class UserAlbums(db.Model):
     owned = db.BooleanProperty(default=True)
 
     def __str__(self):
-        return "%s [%s Owned]" % (self.album, ("Not ", "")[self.owned])
+        return "%s [%sOwned]" % (self.album, ("Not ", "")[self.owned])
 
 class UserAlbumsProcessing(db.Model):
     user  = db.ReferenceProperty(User, required=True)

@@ -24,6 +24,8 @@ class Album(db.Model):
     cover_image_url = db.StringProperty()
     track_count     = db.IntegerProperty()
 
+    last_updated_at = db.DateTimeProperty(auto_now=True)
+
     def __str__(self):
         return "%s - %s" % (self.artist, self.title) or self.mbid
 

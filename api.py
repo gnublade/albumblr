@@ -70,36 +70,55 @@ class API(object):
         if self.updates_enabled and user.is_update_due():
             self.update_user(user)
 
+    def update_album(self, album, lastfm_album=None):
+        try:
+            if lastfm_album is None:
+                album_mbid = album.key().name()
+                lastfm_album = self._lastfm.get_album_by_mbid(album_mbid)
+            else:
+                album_mbid = lastfm_album.get_mbid()
+            assert album_mbid
+
+            # Every album has an Artist.
+            lastfm_artist = lastfm_album.artist
+            artist_mbid = lastfm_artist.get_mbid()
+            assert artist_mbid
+            artist = Artist.get_or_insert(artist_mbid,
+                name = unicode(str(lastfm_artist.get_name()), 'utf8'),
+                url  = lastfm_artist.get_url())
+
+            album_dict = dict(
+                artist = artist,
+                title  = lastfm_album.title,
+                url    = lastfm_album.get_url(),
+                cover_image_url = lastfm_album.get_cover_image(
+                    size = pylast.COVER_MEDIUM),
+                # Inefficient but cached.
+                track_count = len(lastfm_album.get_tracks()))
+
+            album = Album.get_by_key_name(album_mbid)
+            if album is None:
+                album = Album(key_name = album_mbid, **album_dict)
+            else:
+                for key, value in album_dict.iteritems():
+                    setattr(album, key, value)
+            album.put()
+
+        except BadArgumentError, e:
+            logging.debug("Cannot store album '%s'" % lastfm_album)
+        except AssertionError, e:
+            logging.debug(e)
+        return album
+
     def update_user_albums(self, user, page):
         logging.info("Updating page %d albums for '%s'" % (page, user))
         lastfm_user = self._lastfm.get_user(user.username)
         lastfm_lib = lastfm_user.get_library()
-        lastfm_lib_albums = lastfm_lib.get_albums(DEFAULT_LIMIT, page + 1)
+        lastfm_lib_albums = lastfm_lib.get_albums(DEFAULT_LIMIT, page+1)
 
         for lastfm_album in pylast.extract_items(lastfm_lib_albums):
-            try:
-                lastfm_artist = lastfm_album.artist
-                artist_mbid = lastfm_artist.get_mbid()
-                assert artist_mbid
-                artist = Artist.get_or_insert(artist_mbid,
-                    name = unicode(str(lastfm_artist.get_name()), 'utf8'),
-                    url  = lastfm_artist.get_url())
-                album_mbid = lastfm_album.get_mbid()
-                assert album_mbid
-                album = Album.get_or_insert(album_mbid,
-                    artist = artist,
-                    title  = lastfm_album.title,
-                    url    = lastfm_album.get_url(),
-                    cover_image_url = lastfm_album.get_cover_image(
-                        size = pylast.COVER_MEDIUM),
-                    # Inefficient but cached.
-                    track_count = len(lastfm_album.get_tracks()))
-            except BadArgumentError, e:
-                logging.debug("Cannot store album '%s'" % lastfm_album)
-                continue
-            except AssertionError, e:
-                logging.debug("No mbid set for Album '%s' or Artist '%s': %s"
-                              % (lastfm_album, lastfm_artist, e))
+            album = self.update_album(None, lastfm_album)
+            if album is None:
                 continue
 
             q = UserAlbums.all()

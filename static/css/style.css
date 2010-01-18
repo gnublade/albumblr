@@ -50,3 +50,32 @@ a img {
 .clearit {
     clear: both;
 }
+
+.album-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.album-list li {
+    border-top: 1px solid #CCCCCC;
+    height: 64px;
+}
+
+.album-list li .album-item {
+    margin-left: 15px;
+    display: inline-block;
+    vertical-align: top;
+}
+
+.album-item span {
+    display: block;
+}
+
+.album-item .album-artist {
+    font-weight: bold;
+}
+
+.album-item .play-count {
+    color: #696969;
+    font-size: smaller;
+}

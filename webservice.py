@@ -1,16 +1,9 @@
 #!/usr/bin/env python
 
-import os, sys
-import re
 import logging
-from optparse import OptionParser
-from datetime import datetime
-from functools import wraps
-from itertools import islice
 
 from google.appengine.ext import webapp
-from google.appengine.ext.webapp import template, util
-from google.appengine.api.labs import taskqueue
+from google.appengine.ext.webapp import template
 
 from django.utils import simplejson as json
 
@@ -19,40 +12,7 @@ template.register_template_library('templatefilters')
 from api import API
 from config import *
 from model import User, Album, UserAlbums, UserAlbumsProcessing
-
-class ToJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if callable(getattr(obj, '__json__', None)):
-            return obj.__json__()
-        elif hasattr(obj, '__str__'):
-            return obj.__str__()
-        else:
-            raise TypeError(repr(obj) + " is not JSON serializable")
-
-def dumps(o):
-    return json.dumps(o, indent=JSON_INDENT, cls=ToJSONEncoder)
-
-def expose(templatename=None, format=None):
-    if templatename:
-        path = os.path.join(TMPL_PATH, templatename)
-        default_renderer = lambda v: template.render(path, v)
-    else:
-        default_renderer = lambda v: v
-    formats = {
-        'json' : ('text/javascript', dumps),
-        None   : (None, default_renderer) }
-    content_type, renderer = formats.get(format, formats[None])
-    def wrapper(func):
-        @wraps(func)
-        def wrapped(self, *args, **kwargs):
-            if content_type:
-                self.response.headers['Content-Type'] = content_type
-            values = func(self, *args, **kwargs)
-            self.response.out.write(renderer(values))
-        # :TODO: Restrict the methods.
-        wrapped.exposed_methods = [ 'GET', 'POST' ]
-        return wrapped
-    return wrapper
+from util import expose
 
 class MainPage(webapp.RequestHandler):
 
@@ -70,6 +30,13 @@ class BaseUserPage(webapp.RequestHandler):
             self._api = API(enable_updates=update)
         return self._api
 
+def flattened_user_albums(user_albums):
+    for user_album in user_albums:
+        value = user_album.album.__json__()
+        value.update({
+            'num_played_tracks': user_album.num_played_tracks })
+        yield value
+
 class UserPage(BaseUserPage):
 
     def post(self, username):
@@ -80,18 +47,21 @@ class UserPage(BaseUserPage):
     def get(self, username):
         """Show a user page defaulting to a list of owned albums."""
         user = self.api.get_user(username)
-
+        user_details = (user.age, user.gender, user.country)
+        wanted_albums = flattened_user_albums(
+                self.api.get_user_albums_wanted(user))
+        owned_albums = flattened_user_albums(
+                self.api.get_user_albums_owned(user))
         return dict(
             username = username,
-            avatar   = user.avatar,
+            avatar_url = user.avatar_url or DEFAULT_AVATAR_URL,
             realname = user.realname,
-            age      = user.age,
-            gender   = user.gender,
-            country  = user.country,
+            gender = user.gender,
+            user_details = filter(None, user_details),
 
             albums = dict(
-                wanted = self.api.get_albums_wanted(user),
-                owned  = self.api.get_albums_owned(user)))
+                wanted = wanted_albums,
+                owned  = owned_albums))
 
 class UserAlbumsPage(BaseUserPage):
 
@@ -118,24 +88,24 @@ class UserAlbumsPage(BaseUserPage):
         user = self.api.get_user(username)
         self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
-        albums = self.api.get_user_albums(user, page)
-        return albums
+        user_albums = self.api.get_user_albums(user, page)
+        return list(flattened_user_albums(user_albums))
 
     @expose(format='json')
     def wanted(self, username):
         user = self.api.get_user(username)
         self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
-        albums = self.api.get_albums_wanted(user, page)
-        return albums
+        user_albums = self.api.get_user_albums_wanted(user, page)
+        return list(flattened_user_albums(user_albums))
 
     @expose(format='json')
     def owned(self, username):
         user = self.api.get_user(username)
         self.api.maybe_update_user_albums(user, user.last_updated_to)
         page = self.request.get_range('page', min_value=0)
-        albums = self.api.get_albums_owned(user, page)
-        return albums
+        user_albums = self.api.get_user_albums_owned(user, page)
+        return list(flattened_user_albums(user_albums))
 
 app = webapp.WSGIApplication([
         ('/', MainPage),
@@ -145,4 +115,5 @@ app = webapp.WSGIApplication([
     debug = DEBUG)
 
 def run_wsgi_app():
+    from google.appengine.ext.webapp import util
     return util.run_wsgi_app(app)

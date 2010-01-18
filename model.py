@@ -9,21 +9,35 @@ UPDATE_INTERVAL = 1 * SECONDS_PER_DAY
 class Cache(db.Model):
     value = db.TextProperty()
 
+class Artist(db.Model):
+
+    name = db.StringProperty(required=True)
+    url  = db.StringProperty()
+
+    def __str__(self):
+        return str(self.name)
+
 class Album(db.Model):
-    mbid   = db.StringProperty()
-    title  = db.StringProperty()
-    artist = db.StringProperty()
+    title           = db.StringProperty()
+    artist          = db.ReferenceProperty(Artist, required=True)
+    url             = db.StringProperty()
+    cover_image_url = db.StringProperty()
+    track_count     = db.IntegerProperty()
 
     def __str__(self):
         return "%s - %s" % (self.artist, self.title) or self.mbid
 
+    def __json__(self):
+        return dict((k,getattr(self, k)) for k in self.properties())
+
 class User(db.Model):
     username = db.StringProperty(required=True)
-    avatar   = db.StringProperty()
     realname = db.StringProperty()
     age      = db.IntegerProperty()
     gender   = db.StringProperty(choices=["Male", "Female"])
     country  = db.StringProperty()
+
+    avatar_url = db.StringProperty()
 
     last_updated_at = db.DateTimeProperty()
     last_updated_to = db.IntegerProperty()
@@ -54,6 +68,8 @@ class UserAlbums(db.Model):
     user  = db.ReferenceProperty(User, required=True)
     album = db.ReferenceProperty(Album, required=True)
     owned = db.BooleanProperty(default=True)
+
+    num_played_tracks = db.IntegerProperty()
 
     def __str__(self):
         return "%s [%sOwned]" % (self.album, ("Not ", "")[self.owned])

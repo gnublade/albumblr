@@ -4,13 +4,14 @@ import os, sys
 import logging
 from datetime import datetime
 from itertools import ifilter, ifilterfalse
+from math import sqrt
 
 from google.appengine.ext.db import BadArgumentError
 from google.appengine.api.urlfetch import DownloadError
 
 import pylast
 
-from model import Cache, User, Album, Artist, UserAlbums
+from model import Cache, User, Album, Artist, Track, UserAlbums
 from config import *
 
 class _DatastoreCacheBackend(object):
@@ -70,6 +71,24 @@ class API(object):
         if self.updates_enabled and user.is_update_due():
             self.update_user(user)
 
+    def _find_valid_tracks(self, lastfm_album):
+        tracks = lastfm_album.get_tracks()
+        track_vals = sorted(
+            ((t.get_listener_count(), i, t)
+             for (i, t) in enumerate(tracks)),
+            reverse=True)
+        counts = [ x[0] for x in track_vals ]
+        valid_tracks = {}
+        avg = track_vals[0][0]
+        vals = []
+        for count, i, track in track_vals:
+            if count / avg < 0.1:
+                break
+            valid_tracks[i] = track
+            vals.append(count)
+            avg = sum(vals) / float(len(vals))
+        return [ valid_tracks[i] for i in sorted(valid_tracks.keys()) ]
+
     def update_album(self, album, lastfm_album=None):
         try:
             if lastfm_album is None:
@@ -87,14 +106,17 @@ class API(object):
                 name = unicode(str(lastfm_artist.get_name()), 'utf8'),
                 url  = lastfm_artist.get_url())
 
+            # Get a list of track we think is on the album.
+            lastfm_tracks = self._find_valid_tracks(lastfm_album)
+
+            # Create or update the ablum details.
             album_dict = dict(
                 artist = artist,
                 title  = lastfm_album.title,
                 url    = lastfm_album.get_url(),
                 cover_image_url = lastfm_album.get_cover_image(
                     size = pylast.COVER_MEDIUM),
-                # Inefficient but cached.
-                track_count = len(lastfm_album.get_tracks()))
+                track_count = len(lastfm_tracks))
 
             album = Album.get_by_key_name(album_mbid)
             if album is None:
@@ -103,6 +125,21 @@ class API(object):
                 for key, value in album_dict.iteritems():
                     setattr(album, key, value)
             album.put()
+
+            # Create or update the album tracks.
+            album_tracks = dict((t.title, t) for t in album.get_tracks())
+            for i, lastfm_track in enumerate(lastfm_tracks):
+                title = lastfm_track.get_title()
+                if title in album_tracks:
+                    track = lastfm_track
+                    track.position = i
+                    track.put()
+                else:
+                    track = Track(
+                        artist = artist,
+                        album  = album,
+                        title  = title,
+                        position = i)
 
         except BadArgumentError, e:
             logging.debug("Cannot store album '%s'" % lastfm_album)
@@ -132,7 +169,7 @@ class API(object):
                 played_tracks = self._find_played_tracks(
                         lastfm_lib, lastfm_album)
                 played_count = len(played_tracks)
-                owned = (album.track_count - played_count) < 1
+                owned = played_count / float(album.track_count) > 0.75
             except DownloadError, e:
                 logging.debug(str(e))
                 owned = None
@@ -158,14 +195,16 @@ class API(object):
         q.filter('user', user)
         return q.fetch(DEFAULT_LIMIT, offset = DEFAULT_LIMIT * page)
 
-    def _find_played_tracks(self, lib, album):
-        logging.info("Looking for tracks on '%s'" % album)
-        album_tracks = album.get_tracks()
-        played_tracks = lib.get_tracks(
-                artist = album.artist.name,
-                album  = album.title)
+    def _find_played_tracks(self, lastfm_lib, lastfm_album):
+        logging.info("Looking for tracks on '%s'" % lastfm_album)
+        album_mbid = lastfm_album.get_mbid()
+        album = Album.get_by_key_name(album_mbid)
+        tracks = album.get_tracks()
+        played_tracks = lastfm_lib.get_tracks(
+                artist = lastfm_album.artist.name,
+                album  = lastfm_album.title)
         logging.info("    found %d of %d tracks" % (
-            len(played_tracks), len(album_tracks)))
+            len(played_tracks), len(tracks)))
         return played_tracks
 
     def get_user_albums_owned(self, user, page=0):

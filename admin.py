@@ -35,8 +35,7 @@ class UpdatePage(webapp.RequestHandler):
         api = API()
         when = datetime.now() - UPDATE_FREQ
         i = 0
-        albums = Album.gql("WHERE last_updated_at IS NOT NULL "
-                           "AND st_updated_at < :1", when)
+        albums = Album.gql("WHERE last_updated_at < :1", when)
         for i, album in enumerate(albums):
             api.update_album(album)
         return "Update %d Albums" % i

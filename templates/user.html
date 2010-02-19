@@ -18,14 +18,14 @@
 </div>
 </div>
 
-<div id="tabs" class="clearit">
+<div id="tabs" class="clearit ui-tabs">
 <ul>
     <li><a href="#wanted-albums">Would Like</a></li>
     <li class="selected"><a href="#owned-albums">Owned</a></li>
-    <li><a href="#recommended-artist-albums">By Recommended Artists</a></li>
+    <!--<li><a href="#recommended-artist-albums">By Recommended Artists</a></li>-->
 </ul>
 
-<div id="wanted-albums">
+<div id="wanted-albums" class="ui-tabs-hide">
 <p>
 Based on the albums {{ username }}'s got we think {{ gender|heshe }} would like
 the following albums:
@@ -47,7 +47,7 @@ the following albums:
 </ul>
 </div>
 
-<div id="owned-albums">
+<div id="owned-albums" class="ui-tabs-hide">
 <p>
 Below is a list of albums that I think {{ username }} owns, whether on CD or
 some other format.
@@ -104,20 +104,22 @@ function populateAlbumList(ul, albums) {
 function updateAlbums(url, containerId) {
     $.getJSON(url, function (data) {
         if (data) {
-            populateAlbumList($(containerId), data);
-            if (data.length < 10) {
+            if (data.length) {
+                populateAlbumList($(containerId), data);
+            }
+            if (data === true || data.length < 10) {
                 updateAlbums(url, containerId);
             }
         }
     });
 }
-var tabs = [
+var tab_info = [
     [ "albums/wanted", "#wanted-album-list" ],
     [ "albums/owned", "#owned-album-list" ],
     [ "albums/recommended", "#recommended-album-list" ],
 ];
 function selectTab(event, ui) {
-    var tab = tabs[ui.index];
+    var tab = tab_info[ui.index];
     var url = tab[0];
     var containerId = tab[1];
     if ($(containerId).children().length < 10) {
@@ -126,7 +128,8 @@ function selectTab(event, ui) {
 }
 google.setOnLoadCallback(function() {
     var tabs = $("#tabs").tabs({ select: selectTab });
-    selectTab(null, { index: 0 });
+    //selectTab(null, { index: 0 });
+    updateAlbums(tab_info[0][0], tab_info[0][1]);
 });
 </script>
 <script type="text/javascript" src="http://jqueryui.com/latest/ui/ui.tabs.js"></script>

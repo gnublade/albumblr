@@ -4,6 +4,7 @@ import logging
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
+from google.appengine.runtime import DeadlineExceededError
 
 from django.utils import simplejson as json
 
@@ -85,27 +86,45 @@ class UserAlbumsPage(BaseUserPage):
 
     @expose(format='json')
     def index(self, username):
-        user = self.api.get_user(username)
-        self.api.maybe_update_user_albums(user, user.last_updated_to)
-        page = self.request.get_range('page', min_value=0)
-        user_albums = self.api.get_user_albums(user, page)
-        return list(flattened_user_albums(user_albums))
+        try:
+            user = self.api.get_user(username)
+            self.api.maybe_update_user_albums(
+                    user, user.last_updated_to)
+            page = self.request.get_range('page', min_value=0)
+            user_albums = self.api.get_user_albums(user, page)
+            result = list(flattened_user_albums(user_albums))
+        except DeadlineExceededError:
+            # Return an empty list so that the request will be retried.
+            result = True
+        return result
 
     @expose(format='json')
     def wanted(self, username):
-        user = self.api.get_user(username)
-        self.api.maybe_update_user_albums(user, user.last_updated_to)
-        page = self.request.get_range('page', min_value=0)
-        user_albums = self.api.get_user_albums_wanted(user, page)
-        return list(flattened_user_albums(user_albums))
+        try:
+            user = self.api.get_user(username)
+            self.api.maybe_update_user_albums(
+                    user, user.last_updated_to)
+            page = self.request.get_range('page', min_value=0)
+            user_albums = self.api.get_user_albums_wanted(user, page)
+            result = list(flattened_user_albums(user_albums))
+        except DeadlineExceededError:
+            # Return an empty list so that the request will be retried.
+            result = True
+        return result
 
     @expose(format='json')
     def owned(self, username):
-        user = self.api.get_user(username)
-        self.api.maybe_update_user_albums(user, user.last_updated_to)
-        page = self.request.get_range('page', min_value=0)
-        user_albums = self.api.get_user_albums_owned(user, page)
-        return list(flattened_user_albums(user_albums))
+        try:
+            user = self.api.get_user(username)
+            self.api.maybe_update_user_albums(
+                    user, user.last_updated_to)
+            page = self.request.get_range('page', min_value=0)
+            user_albums = self.api.get_user_albums_owned(user, page)
+            result = list(flattened_user_albums(user_albums))
+        except DeadlineExceededError:
+            # Return an empty list so that the request will be retried.
+            result = True
+        return result
 
 app = webapp.WSGIApplication([
         ('/', MainPage),

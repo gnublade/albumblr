@@ -32,6 +32,17 @@ class Album(db.Model):
     def __json__(self):
         return dict((k,getattr(self, k)) for k in self.properties())
 
+    def get_tracks(self):
+        q = Track.all()
+        q.filter('album', self)
+        return q.fetch(self.track_count)
+
+class Track(db.Model):
+    artist = db.ReferenceProperty(Artist, required=True)
+    album  = db.ReferenceProperty(Album, required=True)
+    title  = db.StringProperty(required=True)
+    position = db.IntegerProperty()
+
 class User(db.Model):
     username = db.StringProperty(required=True)
     realname = db.StringProperty()
@@ -62,6 +73,7 @@ class User(db.Model):
             td = datetime.now() - self.last_updated_at
             seconds_since = td.days * SECONDS_PER_DAY + td.seconds
             update_due = seconds_since >= UPDATE_INTERVAL
+            logging.debug("td:%s, %s, %s" % (str(td), seconds_since, update_due))
         else:
             update_due = True # Never been updated
         return update_due

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys
+import os, sys, re
 import logging
 from datetime import datetime
 from itertools import ifilter, ifilterfalse
@@ -10,6 +10,7 @@ from google.appengine.ext.db import BadArgumentError
 from google.appengine.api.urlfetch import DownloadError
 
 import pylast
+import musicbrainz2.webservice as ws
 
 from model import Cache, User, Album, Artist, Track, UserAlbums
 from config import *
@@ -72,22 +73,29 @@ class API(object):
             self.update_user(user)
 
     def _find_valid_tracks(self, lastfm_album):
-        tracks = lastfm_album.get_tracks()
-        track_vals = sorted(
-            ((t.get_listener_count(), i, t)
-             for (i, t) in enumerate(tracks)),
-            reverse=True)
-        counts = [ x[0] for x in track_vals ]
-        valid_tracks = {}
-        avg = track_vals[0][0]
-        vals = []
-        for count, i, track in track_vals:
-            if count / avg < 0.1:
-                break
-            valid_tracks[i] = track
-            vals.append(count)
-            avg = sum(vals) / float(len(vals))
-        return [ valid_tracks[i] for i in sorted(valid_tracks.keys()) ]
+        q = ws.Query()
+        mb_incs = ws.ReleaseIncludes(tracks=True)
+        try:
+            mb_album = q.getReleaseById(lastfm_album.get_mbid(), mb_incs)
+            logging.debug("Found MB Release: %s" % mb_album)
+        except ws.ResourceNotFoundError:
+            logging.debug("MusicBrainz couldn't find album: %s" % lastfm_album)
+            raise
+        p = re.compile("[\W]+")
+        def normalise(s):
+            return p.sub("", s.lower())
+        lastfm_track_map = dict(
+            (normalise(t.get_title()), t) for t in lastfm_album.get_tracks())
+        tracks = []
+        for mb_track in mb_album.getTracks():
+            track_title = mb_track.getTitle()
+            lastfm_track = lastfm_track_map.get(normalise(track_title))
+            if lastfm_track:
+                logging.debug("Matched MusicBrainz track: %s" % track_title)
+                tracks.append(lastfm_track)
+            else:
+                logging.debug("Failed to match track: %s" % track_title)
+        return tracks
 
     def update_album(self, album, lastfm_album=None):
         try:
@@ -143,7 +151,7 @@ class API(object):
 
         except BadArgumentError, e:
             logging.debug("Cannot store album '%s'" % lastfm_album)
-        except AssertionError, e:
+        except (AssertionError, ws.ResourceNotFoundError), e:
             logging.debug(e)
         return album
 
@@ -190,7 +198,7 @@ class API(object):
             user.is_update_due() or user.last_updated_to <= page):
             self.update_user_albums(user, page)
 
-    def get_user_albums(self, user, page):
+    def get_user_albums(self, user, page=0):
         q = UserAlbums.all()
         q.filter('user', user)
         return q.fetch(DEFAULT_LIMIT, offset = DEFAULT_LIMIT * page)

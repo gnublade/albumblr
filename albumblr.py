@@ -6,8 +6,15 @@ import logging
 from optparse import OptionParser
 
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(os.path.join(DIR_PATH, 'lib'))
+LIB_PATH = os.path.join(DIR_PATH, 'lib')
+if LIB_PATH not in sys.path: sys.path.append(LIB_PATH)
 import pylast
+
+try:
+    import musicbrainz2
+except ImportError:
+    MB_PATH = os.path.join(LIB_PATH, 'musicbrainz2.zip')
+    if MB_PATH not in sys.path: sys.path.insert(0, MB_PATH)
 
 from api import API
 

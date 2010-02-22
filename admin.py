@@ -6,8 +6,15 @@ from datetime import datetime, timedelta
 from google.appengine.ext import webapp, db
 
 DIR_PATH = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(os.path.join(DIR_PATH, 'lib'))
+LIB_PATH = os.path.join(DIR_PATH, 'lib')
+if LIB_PATH not in sys.path: sys.path.append(LIB_PATH)
 import pylast
+
+try:
+    import musicbrainz2
+except ImportError:
+    MB_PATH = os.path.join(LIB_PATH, 'musicbrainz2.zip')
+    if MB_PATH not in sys.path: sys.path.insert(0, MB_PATH)
 
 from config import *
 from api import API
@@ -43,8 +50,11 @@ class UpdatePage(webapp.RequestHandler):
 
 class DeletePage(webapp.RequestHandler):
 
-    def get(self):
-        self.delete_everything()
+    def get(self, user):
+        if user:
+            self.delete_user(user)
+        else:
+            self.delete_everything()
 
     def post(self):
         self.delete_everything()
@@ -53,13 +63,23 @@ class DeletePage(webapp.RequestHandler):
     def delete_everything(self):
         db.delete(UserAlbums.all(keys_only=True))
         db.delete(Album.all(keys_only=True))
+        db.delete(Artist.all(keys_only=True))
         db.delete(User.all(keys_only=True))
         return "Deleted everything.. hope you're happy with yourself!"
+
+    @expose()
+    def delete_user(self, username):
+        user = User.get_by_key_name(username)
+        q = UserAlbums.all(keys_only=True)
+        q.filter('user', user)
+        db.delete(q)
+        user.delete()
+        return "Deleted user '%s'" % username
 
 app = webapp.WSGIApplication([
         ('/admin/', AdminPage),
         ('/admin/update/.*', UpdatePage),
-        ('/admin/delete/.*', DeletePage),
+        ('/admin/delete/(.*)', DeletePage),
     ],
     debug = DEBUG)
 

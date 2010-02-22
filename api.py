@@ -154,7 +154,7 @@ class API(object):
 
         except BadArgumentError, e:
             logging.debug("Cannot store album '%s'" % lastfm_album)
-        except (AssertionError, ws.ResourceNotFoundError), e:
+        except (AssertionError, ws.ResourceNotFoundError, ws.WebServiceError), e:
             logging.debug(e)
         return album
 

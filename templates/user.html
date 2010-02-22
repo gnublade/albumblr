@@ -69,23 +69,26 @@ some other format.
 </ul>
 </div>
 
+<!--
 <div id="recommended-artist-albums">
 <p>
 These are some artists recommended to {{ username }}, probably best taken with
 a pinch of salt.
 </p>
 </div>
+-->
 {% endblock %}
 
 {% block bodyscript %}
 <script src="http://www.google.com/jsapi"></script>
 <script>
-google.load("jquery", "1.3.2");
+google.load("jquery", "1.4.2");
 google.load("jqueryui", "1.7.2");
 function default_if_null(value, default_value) {
     return (value === null) ? default_value : value;
 }
 function populateAlbumList(ul, albums) {
+    var loader = $('#loader').detach();
     ul.empty();
     for (var i = 0; i < albums.length; i++) {
         var album = albums[i];
@@ -100,18 +103,22 @@ function populateAlbumList(ul, albums) {
         var html = "<li>\n" + img + item + "</li>\n";
         ul.append(html);
     }
+    ul.append(loader);
 }
-function updateAlbums(url, containerId) {
+function addLoader(ul) {
     var html = "<li id='loader'>\n"
              + "<span class='album-image'><img src='/static/images/ajax-loader.gif' /></span>\n"
              + "<span class='album-item'>Looking for more albums...</span>\n"
              + "</li>";
-    $(containerId).append(html);
-    $('#loader').hide().ajaxStart(function () {
+    ul.append(html);
+    $('#loader').hide();
+    $('#loader').ajaxStart(function () {
         $(this).show();
     }).ajaxStop(function () {
         $(this).hide();
     });
+}
+function updateAlbums(url, containerId) {
     $.getJSON(url, function (data) {
         if (data) {
             if (data.length) {
@@ -139,6 +146,7 @@ function selectTab(event, ui) {
 google.setOnLoadCallback(function() {
     var tabs = $("#tabs").tabs({ select: selectTab });
     //selectTab(null, { index: 0 });
+    addLoader($(tab_info[0][1]));
     updateAlbums(tab_info[0][0], tab_info[0][1]);
 });
 </script>

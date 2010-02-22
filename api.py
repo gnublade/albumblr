@@ -154,7 +154,8 @@ class API(object):
 
         except BadArgumentError, e:
             logging.debug("Cannot store album '%s'" % lastfm_album)
-        except (AssertionError, ws.ResourceNotFoundError, ws.WebServiceError), e:
+        except (AssertionError, ws.ResourceNotFoundError,
+                ws.WebServiceError, DownloadError, pylast.WSError), e:
             logging.debug(e)
         return album
 
@@ -181,7 +182,7 @@ class API(object):
                         lastfm_lib, lastfm_album)
                 played_count = len(played_tracks)
                 owned = played_count / float(album.track_count) > 0.75
-            except DownloadError, e:
+            except (DownloadError, ZeroDevisionError), e:
                 logging.debug(str(e))
                 owned = None
             if user_album is None:

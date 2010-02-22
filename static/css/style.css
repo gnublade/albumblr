@@ -71,6 +71,24 @@ a img {
     display: block;
 }
 
+.album-image {
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    margin: 0;
+}
+
+#loader {
+    margin-top: 5px;
+    background: #CCCCCC;
+    border: 1px solid #AAAAAA;
+}
+
+#loader .album-item, #loader img {
+    margin: 16px;
+    vertical-align: middle;
+}
+
 .album-item .album-artist {
     font-weight: bold;
 }

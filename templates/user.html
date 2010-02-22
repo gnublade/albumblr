@@ -102,6 +102,16 @@ function populateAlbumList(ul, albums) {
     }
 }
 function updateAlbums(url, containerId) {
+    var html = "<li id='loader'>\n"
+             + "<span class='album-image'><img src='/static/images/ajax-loader.gif' /></span>\n"
+             + "<span class='album-item'>Looking for more albums...</span>\n"
+             + "</li>";
+    $(containerId).append(html);
+    $('#loader').hide().ajaxStart(function () {
+        $(this).show();
+    }).ajaxStop(function () {
+        $(this).hide();
+    });
     $.getJSON(url, function (data) {
         if (data) {
             if (data.length) {

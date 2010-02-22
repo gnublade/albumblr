@@ -111,12 +111,14 @@ class API(object):
             lastfm_artist = lastfm_album.artist
             artist_mbid = lastfm_artist.get_mbid()
             assert artist_mbid
+            logging.debug(lastfm_artist.get_name())
+            artist_name = lastfm_artist.get_name()
             artist = Artist.get_or_insert(artist_mbid,
-                name = unicode(str(lastfm_artist.get_name()), 'utf8'),
+                name = unicode(artist_name),
                 url  = lastfm_artist.get_url())
 
             # Get a list of track we think is on the album.
-            lastfm_tracks = self._find_valid_tracks(lastfm_album)
+            lastfm_tracks, track_count = self._find_valid_tracks(lastfm_album)
 
             # Create or update the ablum details.
             album_dict = dict(

@@ -15,7 +15,7 @@ class Artist(db.Model):
     url  = db.StringProperty()
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
 class Album(db.Model):
     title           = db.StringProperty()

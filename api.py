@@ -74,7 +74,7 @@ class API(object):
 
     def _find_valid_tracks(self, lastfm_album):
         q = ws.Query()
-        mb_incs = ws.ReleaseIncludes(tracks=True)
+        mb_incs = ws.ReleaseIncludes(tracks=True, counts=True)
         try:
             mb_album = q.getReleaseById(lastfm_album.get_mbid(), mb_incs)
             logging.debug("Found MB Release: %s" % mb_album)
@@ -87,7 +87,8 @@ class API(object):
         lastfm_track_map = dict(
             (normalise(t.get_title()), t) for t in lastfm_album.get_tracks())
         tracks = []
-        for mb_track in mb_album.getTracks():
+        mb_tracks = mb_album.getTracks()
+        for mb_track in mb_tracks:
             track_title = mb_track.getTitle()
             lastfm_track = lastfm_track_map.get(normalise(track_title))
             if lastfm_track:
@@ -95,7 +96,7 @@ class API(object):
                 tracks.append(lastfm_track)
             else:
                 logging.debug("Failed to match track: %s" % track_title)
-        return tracks
+        return tracks, mb_album.getTracksCount() or len(mb_tracks)
 
     def update_album(self, album, lastfm_album=None):
         try:
@@ -124,7 +125,7 @@ class API(object):
                 url    = lastfm_album.get_url(),
                 cover_image_url = lastfm_album.get_cover_image(
                     size = pylast.COVER_MEDIUM),
-                track_count = len(lastfm_tracks))
+                track_count = track_count)
 
             album = Album.get_by_key_name(album_mbid)
             if album is None:
@@ -212,7 +213,7 @@ class API(object):
                 artist = lastfm_album.artist.name,
                 album  = lastfm_album.title)
         logging.info("    found %d of %d tracks" % (
-            len(played_tracks), len(tracks)))
+            len(played_tracks), album.track_count))
         return played_tracks
 
     def get_user_albums_owned(self, user, page=0):
